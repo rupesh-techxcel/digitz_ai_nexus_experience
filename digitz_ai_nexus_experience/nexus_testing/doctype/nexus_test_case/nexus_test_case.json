@@ -1,0 +1,253 @@
+{
+ "actions": [], 
+ "allow_rename": 1,
+ "autoname": "field:test_title",
+ "creation": "2026-05-03 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "test_title",
+  "enabled",
+  "test_category",
+  "short_description",
+  "section_scope",
+  "tenant",
+  "business_unit",
+  "project",
+  "project_scope_mode",
+  "section_context",
+  "context",
+  "sub_context",
+  "entity_type",
+  "entity",
+  "topic",
+  "section_question",
+  "query",
+  "top_k",
+  "use_case",
+  "section_user",
+  "user_roles",
+  "user_designation",
+  "user_id",
+  "section_expected",
+  "expected_access_status",
+  "expected_answer_contains",
+  "expected_source_count_min",
+  "expected_fallback_used",
+  "section_json",
+  "query_contract_json",
+  "last_run_status",
+  "last_run_at"
+ ],
+ "fields": [
+  {
+   "fieldname": "test_title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Test Title",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "test_category",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Test Category",
+   "options": "Public Knowledge\nAccess Control\nBusiness Unit Scope\nProject Scope\nFallback\nResponse Behaviour\nGovernance\nCustom"
+  },
+  {
+   "fieldname": "short_description",
+   "fieldtype": "Small Text",
+   "label": "Short Description"
+  },
+  {
+   "fieldname": "section_scope",
+   "fieldtype": "Section Break",
+   "label": "Scope"
+  },
+  {
+   "fieldname": "tenant",
+   "fieldtype": "Link",
+   "label": "Tenant",
+   "options": "Nexus Tenant",
+   "reqd": 1
+  },
+  {
+   "fieldname": "business_unit",
+   "fieldtype": "Data",
+   "label": "Business Unit",
+   "reqd": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Data",
+   "label": "Project"
+  },
+  {
+   "fieldname": "project_scope_mode",
+   "fieldtype": "Select",
+   "label": "Project Scope Mode",
+   "options": "\nwith_general\nstrict"
+  },
+  {
+   "fieldname": "section_context",
+   "fieldtype": "Section Break",
+   "label": "Knowledge Context"
+  },
+  {
+   "fieldname": "context",
+   "fieldtype": "Data",
+   "label": "Context",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sub_context",
+   "fieldtype": "Data",
+   "label": "Sub Context"
+  },
+  {
+   "fieldname": "entity_type",
+   "fieldtype": "Data",
+   "label": "Entity Type"
+  },
+  {
+   "fieldname": "entity",
+   "fieldtype": "Data",
+   "label": "Entity"
+  },
+  {
+   "fieldname": "topic",
+   "fieldtype": "Data",
+   "label": "Topic"
+  },
+  {
+   "fieldname": "section_question",
+   "fieldtype": "Section Break",
+   "label": "Question"
+  },
+  {
+   "fieldname": "query",
+   "fieldtype": "Long Text",
+   "label": "Question",
+   "reqd": 1
+  },
+  {
+   "default": "5",
+   "fieldname": "top_k",
+   "fieldtype": "Int",
+   "label": "Top K"
+  },
+  {
+   "default": "qa",
+   "fieldname": "use_case",
+   "fieldtype": "Select",
+   "label": "Use Case",
+   "options": "qa\nchat\nsupport\ntraining"
+  },
+  {
+   "fieldname": "section_user",
+   "fieldtype": "Section Break",
+   "label": "User Context"
+  },
+  {
+   "default": "Guest",
+   "description": "Comma separated roles. Example: Guest, Accounts Manager",
+   "fieldname": "user_roles",
+   "fieldtype": "Small Text",
+   "label": "User Roles"
+  },
+  {
+   "fieldname": "user_designation",
+   "fieldtype": "Data",
+   "label": "User Designation"
+  },
+  {
+   "fieldname": "user_id",
+   "fieldtype": "Data",
+   "label": "User ID"
+  },
+  {
+   "fieldname": "section_expected",
+   "fieldtype": "Section Break",
+   "label": "Expected Result"
+  },
+  {
+   "fieldname": "expected_access_status",
+   "fieldtype": "Select",
+   "label": "Expected Access Status",
+   "options": "\nallowed\nno_context\ndenied\nrestricted"
+  },
+  {
+   "fieldname": "expected_answer_contains",
+   "fieldtype": "Data",
+   "label": "Expected Answer Contains"
+  },
+  {
+   "default": "0",
+   "fieldname": "expected_source_count_min",
+   "fieldtype": "Int",
+   "label": "Expected Minimum Source Count"
+  },
+  {
+   "default": "0",
+   "fieldname": "expected_fallback_used",
+   "fieldtype": "Check",
+   "label": "Expected Fallback Used"
+  },
+  {
+   "fieldname": "section_json",
+   "fieldtype": "Section Break",
+   "label": "Generated Query Contract"
+  },
+  {
+   "fieldname": "query_contract_json",
+   "fieldtype": "Code",
+   "label": "Query Contract JSON",
+   "options": "JSON",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_run_status",
+   "fieldtype": "Data",
+   "label": "Last Run Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_run_at",
+   "fieldtype": "Datetime",
+   "label": "Last Run At",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-05-06 12:00:14.491900",
+ "modified_by": "Administrator",
+ "module": "Nexus Testing",
+ "name": "Nexus Test Case",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

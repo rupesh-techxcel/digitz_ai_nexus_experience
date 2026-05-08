@@ -4,3 +4,5 @@
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
+
+digitz_ai_nexus_experience.patches.v0_0_2.seed_nexus_test_cases
