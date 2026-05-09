@@ -223,7 +223,7 @@ Retrieval should not crash when this approved chunk has empty embedding.
             "embedding": "",
         },
 
-        # ------------------------------------------------------------
+               # ------------------------------------------------------------
         # INGESTED RETRIEVAL FIXTURES
         # ------------------------------------------------------------
         {
@@ -243,11 +243,11 @@ Retrieval should not crash when this approved chunk has empty embedding.
             "is_active": 1,
             "disabled": 0,
             "embedding_status": "Completed",
-            "allowed_roles": ["Guest", "Accounts Manager"],
+            "allowed_roles": ["Guest", "Orbit Analyst"],
             "content": """
-Ingested public knowledge confirms that hire return valuation can be retrieved from ingestion-generated chunks.
+Ingested public knowledge confirms that Nexus Test Orbit observability can be retrieved from ingestion-generated chunks.
 
-Hire return valuation is validated through governed knowledge retrieval, chunk generation, embedding generation, and approved Q&A availability.
+Nexus Test Orbit observability is validated through governed knowledge retrieval, chunk generation, embedding generation, and approved Q&A availability.
 """,
             "embedding": DUMMY_EMBEDDING,
         },
@@ -268,11 +268,11 @@ Hire return valuation is validated through governed knowledge retrieval, chunk g
             "is_active": 1,
             "disabled": 0,
             "embedding_status": "Completed",
-            "allowed_roles": ["Accounts Manager"],
+            "allowed_roles": ["Orbit Analyst"],
             "content": """
-Restricted ingested payroll valuation knowledge is available only to the Accounts Manager role.
+Restricted ingested Orbit Calibration knowledge is available only to the Orbit Analyst role.
 
-This fixture validates that role-based access works correctly for ingestion-generated knowledge.
+Orbit Calibration uses the Blue Radius Index to validate that role-based access works correctly for ingestion-generated knowledge.
 """,
             "embedding": DUMMY_EMBEDDING,
         },
@@ -293,12 +293,13 @@ This fixture validates that role-based access works correctly for ingestion-gene
             "is_active": 1,
             "disabled": 0,
             "embedding_status": "Completed",
-            "allowed_roles": ["Accounts Manager"],
+            "allowed_roles": ["Orbit Analyst"],
+            "denied_roles": ["Orbit Viewer"],
             "content": """
-Restricted margin knowledge is available only to the Accounts Manager role.
+        Restricted Orbit Signal knowledge is available only to the Orbit Analyst role.
 
-Sales User must not retrieve this restricted ingested margin knowledge.
-""",
+        Orbit Viewer must not retrieve this restricted ingested Orbit Signal knowledge.
+        """,
             "embedding": DUMMY_EMBEDDING,
         },
         {
@@ -318,11 +319,15 @@ Sales User must not retrieve this restricted ingested margin knowledge.
             "is_active": 1,
             "disabled": 0,
             "embedding_status": "Completed",
-            "allowed_roles": ["Guest", "Accounts Manager"],
+            "allowed_roles": ["Guest", "Orbit Analyst"],
             "content": """
-Keyword retrieval test confirms that scaffold hire return inspection and valuation can be found through business terms.
+Blue Radius Discovery is a synthetic public keyword retrieval validation phrase.
 
-The phrase scaffold hire return inspection is intentionally included for keyword retrieval validation.
+The phrase Blue Radius Discovery is intentionally repeated for retrieval stability.
+
+Blue Radius Discovery confirms that public ingestion-generated chunks can be retrieved through keyword scoring.
+
+Synthetic business keyword validation uses Blue Radius Discovery for deterministic retrieval testing.
 """,
             "embedding": DUMMY_EMBEDDING,
         },
@@ -343,13 +348,191 @@ The phrase scaffold hire return inspection is intentionally included for keyword
             "is_active": 1,
             "disabled": 0,
             "embedding_status": "Pending",
-            "allowed_roles": ["Guest", "Accounts Manager"],
+            "allowed_roles": ["Guest", "Orbit Analyst"],
             "content": """
 Missing embedding safety fixture for ingested retrieval.
 
 This chunk intentionally has no embedding and should not crash retrieval.
 """,
             "embedding": "",
+        },
+                # ------------------------------------------------------------
+        # KNOWLEDGE SOURCE QUALITY PANEL / INGESTION GOVERNANCE FIXTURES
+        # ------------------------------------------------------------
+        {
+            "name": "TEST-NEXUS-KNOWLEDGE-SOURCE-PROCESSING",
+            "title": "Knowledge Source Processing Fixture",
+            "tenant": SYNTHETIC["tenant"],
+            "business_unit": SYNTHETIC["business_unit"],
+            "scope_type": "general",
+            "context": "Nexus Knowledge",
+            "sub_context": "Ingestion",
+            "entity_type": "Knowledge Source",
+            "entity": "Quality Panel",
+            "topic": "Knowledge Source Processing",
+            "access_policy": "role_based",
+            "status": "Approved",
+            "enabled": 1,
+            "is_active": 1,
+            "disabled": 0,
+            "embedding_status": "Completed",
+            "allowed_roles": ["Orbit Analyst"],
+            "content": """
+Nexus processes a knowledge source by extracting readable text, normalizing the content, creating a generated knowledge unit, splitting the content into chunks, creating embeddings, and updating the source quality fields.
+
+The knowledge source processing flow gives administrators visibility into processing status, chunk count, embedding status, last processed time, extracted text preview, generated knowledge unit, and generated chunks.
+""",
+            "embedding": DUMMY_EMBEDDING,
+        },
+        {
+            "name": "TEST-NEXUS-EXTRACTED-TEXT-PREVIEW",
+            "title": "Extracted Text Preview Fixture",
+            "tenant": SYNTHETIC["tenant"],
+            "business_unit": SYNTHETIC["business_unit"],
+            "scope_type": "general",
+            "context": "Nexus Knowledge",
+            "sub_context": "Extraction",
+            "entity_type": "Knowledge Source",
+            "entity": "Text Extraction",
+            "topic": "Extracted Text Preview",
+            "access_policy": "role_based",
+            "status": "Approved",
+            "enabled": 1,
+            "is_active": 1,
+            "disabled": 0,
+            "embedding_status": "Completed",
+            "allowed_roles": ["Orbit Analyst"],
+            "content": """
+Extracted text preview in Nexus shows the readable text captured from a manual source or uploaded document before the content is used for chunking and embeddings.
+
+The extracted text preview helps administrators identify bad extraction, missing text, corrupted PDF content, formatting issues, and incomplete source material before publishing knowledge.
+""",
+            "embedding": DUMMY_EMBEDDING,
+        },
+        {
+            "name": "TEST-NEXUS-GENERATED-KNOWLEDGE-UNIT",
+            "title": "Generated Knowledge Unit Fixture",
+            "tenant": SYNTHETIC["tenant"],
+            "business_unit": SYNTHETIC["business_unit"],
+            "scope_type": "general",
+            "context": "Nexus Knowledge",
+            "sub_context": "Knowledge Unit",
+            "entity_type": "Knowledge Source",
+            "entity": "Knowledge Unit",
+            "topic": "Generated Knowledge Unit",
+            "access_policy": "role_based",
+            "status": "Approved",
+            "enabled": 1,
+            "is_active": 1,
+            "disabled": 0,
+            "embedding_status": "Completed",
+            "allowed_roles": ["Orbit Analyst"],
+            "content": """
+Nexus links a processed knowledge source to a generated knowledge unit.
+
+The generated knowledge unit is the normalized master knowledge object created from the source. It connects the original source to generated chunks, embeddings, retrieval, and governed AI answers.
+""",
+            "embedding": DUMMY_EMBEDDING,
+        },
+        {
+            "name": "TEST-NEXUS-GENERATED-CHUNKS",
+            "title": "Generated Chunks Fixture",
+            "tenant": SYNTHETIC["tenant"],
+            "business_unit": SYNTHETIC["business_unit"],
+            "scope_type": "general",
+            "context": "Nexus Knowledge",
+            "sub_context": "Chunking",
+            "entity_type": "Knowledge Chunk",
+            "entity": "Generated Chunks",
+            "topic": "Chunk Generation",
+            "access_policy": "role_based",
+            "status": "Approved",
+            "enabled": 1,
+            "is_active": 1,
+            "disabled": 0,
+            "embedding_status": "Completed",
+            "allowed_roles": ["Orbit Analyst"],
+            "content": """
+Nexus generates chunks by splitting normalized source text into smaller knowledge segments.
+
+Generated chunks improve retrieval quality because each chunk can be embedded, scored, filtered by metadata, governed by access rules, and used as grounded source material for AI answers.
+""",
+            "embedding": DUMMY_EMBEDDING,
+        },
+        {
+            "name": "TEST-NEXUS-EMBEDDING-STATUS-COMPLETED",
+            "title": "Embedding Status Completed Fixture",
+            "tenant": SYNTHETIC["tenant"],
+            "business_unit": SYNTHETIC["business_unit"],
+            "scope_type": "general",
+            "context": "Nexus Knowledge",
+            "sub_context": "Embeddings",
+            "entity_type": "Knowledge Source",
+            "entity": "Embedding Status",
+            "topic": "Embedding Completion",
+            "access_policy": "role_based",
+            "status": "Approved",
+            "enabled": 1,
+            "is_active": 1,
+            "disabled": 0,
+            "embedding_status": "Completed",
+            "allowed_roles": ["Orbit Analyst"],
+            "content": """
+Nexus verifies embedding completion by checking whether generated chunks have embeddings.
+
+When all generated chunks are embedded, the embedding status can be marked Completed on the knowledge source and the generated knowledge unit. The chunk embedding state remains the real source of truth.
+""",
+            "embedding": DUMMY_EMBEDDING,
+        },
+        {
+            "name": "TEST-NEXUS-QUALITY-PANEL-REFRESH",
+            "title": "Quality Panel Refresh Fixture",
+            "tenant": SYNTHETIC["tenant"],
+            "business_unit": SYNTHETIC["business_unit"],
+            "scope_type": "general",
+            "context": "Nexus Knowledge",
+            "sub_context": "Quality Panel",
+            "entity_type": "Knowledge Source",
+            "entity": "Quality Panel",
+            "topic": "Quality Panel Refresh",
+            "access_policy": "role_based",
+            "status": "Approved",
+            "enabled": 1,
+            "is_active": 1,
+            "disabled": 0,
+            "embedding_status": "Completed",
+            "allowed_roles": ["Orbit Analyst"],
+            "content": """
+The Nexus quality panel refresh reloads the latest ingestion observability data for a knowledge source.
+
+It returns processing status, embedding status, chunk count, last processed time, extracted text preview, generated knowledge unit, and generated chunks so administrators can verify knowledge readiness.
+""",
+            "embedding": DUMMY_EMBEDDING,
+        },
+        {
+            "name": "TEST-NEXUS-TEST-THIS-SOURCE",
+            "title": "Test This Source Fixture",
+            "tenant": SYNTHETIC["tenant"],
+            "business_unit": SYNTHETIC["business_unit"],
+            "scope_type": "general",
+            "context": "Nexus Knowledge",
+            "sub_context": "Source Testing",
+            "entity_type": "Knowledge Source",
+            "entity": "Source Testing",
+            "topic": "Grounded Validation",
+            "access_policy": "role_based",
+            "status": "Approved",
+            "enabled": 1,
+            "is_active": 1,
+            "disabled": 0,
+            "embedding_status": "Completed",
+            "allowed_roles": ["Orbit Analyst"],
+            "content": """
+Nexus tests a processed source by asking a grounded question against approved chunks created from that source.
+
+The Test This Source action helps administrators confirm whether the processed source can produce a grounded answer before the knowledge is exposed to public Q&A or website chat.
+""",
+            "embedding": DUMMY_EMBEDDING,
         },
     ]
 
