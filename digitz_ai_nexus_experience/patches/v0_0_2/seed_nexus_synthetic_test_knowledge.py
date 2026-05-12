@@ -24,6 +24,10 @@ SYNTHETIC = {
     "deny_topic": "Orbit Deny Priority",
     "missing_embedding_topic": "Orbit Missing Embedding",
     "ingested_topic": "Ingested Retrieval",
+    "reprocess_topic": "Reprocess Governance",
+    "observatory_topic": "Chunk Observatory",
+    "retrieval_ready_topic": "Retrieval Readiness",
+    "archived_chunk_topic": "Archived Chunk Governance",
 }
 
 
@@ -534,6 +538,106 @@ The Test This Source action helps administrators confirm whether the processed s
 """,
             "embedding": DUMMY_EMBEDDING,
         },
+        {
+    "name": "TEST-NEXUS-REPROCESS-GOVERNANCE",
+    "title": "Reprocess Governance Fixture",
+    "tenant": SYNTHETIC["tenant"],
+    "business_unit": SYNTHETIC["business_unit"],
+    "scope_type": "general",
+    "context": "Nexus Knowledge",
+    "sub_context": "Ingestion Governance",
+    "entity_type": "Knowledge Source",
+    "entity": "Reprocess Governance",
+    "topic": SYNTHETIC["reprocess_topic"],
+    "access_policy": "role_based",
+    "status": "Approved",
+    "enabled": 1,
+    "is_active": 1,
+    "disabled": 0,
+    "embedding_status": "Completed",
+    "allowed_roles": ["Orbit Analyst"],
+    "content": """
+Nexus reprocess governance prevents retrieval pollution by archiving old chunks and disabling old generated knowledge versions before creating fresh chunks.
+
+Each processing run increments the processing version and assigns the new source version to active chunks.
+""",
+    "embedding": DUMMY_EMBEDDING,
+},
+{
+    "name": "TEST-NEXUS-CHUNK-OBSERVATORY",
+    "title": "Chunk Observatory Fixture",
+    "tenant": SYNTHETIC["tenant"],
+    "business_unit": SYNTHETIC["business_unit"],
+    "scope_type": "general",
+    "context": "Nexus Knowledge",
+    "sub_context": "Observability",
+    "entity_type": "Knowledge Chunk",
+    "entity": "Chunk Observatory",
+    "topic": SYNTHETIC["observatory_topic"],
+    "access_policy": "role_based",
+    "status": "Approved",
+    "enabled": 1,
+    "is_active": 1,
+    "disabled": 0,
+    "embedding_status": "Completed",
+    "allowed_roles": ["Orbit Analyst"],
+    "content": """
+The Chunk Observatory shows processing version, chunk count, active chunks, embedded chunks, missing embeddings, duplicate chunks, diagnostics status, and retrieval readiness.
+
+It helps administrators inspect generated chunks, chunk text, metadata, embedding state, archived state, and retrieval readiness.
+""",
+    "embedding": DUMMY_EMBEDDING,
+},
+{
+    "name": "TEST-NEXUS-RETRIEVAL-READINESS",
+    "title": "Retrieval Readiness Fixture",
+    "tenant": SYNTHETIC["tenant"],
+    "business_unit": SYNTHETIC["business_unit"],
+    "scope_type": "general",
+    "context": "Nexus Knowledge",
+    "sub_context": "Readiness",
+    "entity_type": "Knowledge Source",
+    "entity": "Retrieval Readiness",
+    "topic": SYNTHETIC["retrieval_ready_topic"],
+    "access_policy": "role_based",
+    "status": "Approved",
+    "enabled": 1,
+    "is_active": 1,
+    "disabled": 0,
+    "embedding_status": "Completed",
+    "allowed_roles": ["Orbit Analyst"],
+    "content": """
+Retrieval readiness means a knowledge source is safe for production retrieval.
+
+A source becomes retrieval ready only when it is published, processed, embedded, diagnostically healthy, and has active chunks available for retrieval.
+""",
+    "embedding": DUMMY_EMBEDDING,
+},
+{
+    "name": "TEST-NEXUS-ARCHIVED-CHUNK-GOVERNANCE",
+    "title": "Archived Chunk Governance Fixture",
+    "tenant": SYNTHETIC["tenant"],
+    "business_unit": SYNTHETIC["business_unit"],
+    "scope_type": "general",
+    "context": "Nexus Knowledge",
+    "sub_context": "Chunk Lifecycle",
+    "entity_type": "Knowledge Chunk",
+    "entity": "Archived Chunks",
+    "topic": SYNTHETIC["archived_chunk_topic"],
+    "access_policy": "role_based",
+    "status": "Approved",
+    "enabled": 1,
+    "is_active": 1,
+    "disabled": 0,
+    "embedding_status": "Completed",
+    "allowed_roles": ["Orbit Analyst"],
+    "content": """
+Archived chunks remain visible for observability and audit history, but they are disabled and excluded from active retrieval readiness calculations.
+
+Only active chunks should determine retrieval readiness, duplicate diagnostics, and production retrieval eligibility.
+""",
+    "embedding": DUMMY_EMBEDDING,
+},
     ]
 
     for row in knowledge_units:
@@ -689,10 +793,23 @@ def upsert_chunk(unit, data):
         chunk.name = chunk_name
 
     set_if_field(chunk, "knowledge_unit", unit.name)
+    if data.get("knowledge_source") and frappe.db.exists("Nexus Knowledge Source", data.get("knowledge_source")):
+        set_if_field(chunk, "knowledge_source", data.get("knowledge_source"))
     set_if_field(chunk, "chunk_index", 1)
 
     set_common_fields(chunk, data)
     set_content_fields(chunk, data.get("content"))
+
+    set_if_field(chunk, "source_version", data.get("source_version") or 1)
+    set_if_field(chunk, "archived", data.get("archived", 0))
+    set_if_field(chunk, "disabled", data.get("disabled", 0))
+    set_if_field(chunk, "enabled", data.get("enabled", 1))
+    set_if_field(chunk, "is_active", data.get("is_active", 1))
+
+    set_if_field(chunk, "character_count", len(clean_text(data.get("content"))))
+    set_if_field(chunk, "diagnostics_status", data.get("diagnostics_status") or "Healthy")
+    set_if_field(chunk, "diagnostics_message", data.get("diagnostics_message") or "Seed chunk passed diagnostics")
+    set_if_field(chunk, "embedding_status", data.get("embedding_status") or "Completed")
     set_roles(chunk, data.get("allowed_roles") or [], data.get("denied_roles") or [])
 
     if chunk.meta.has_field("embedding"):
@@ -724,6 +841,11 @@ def set_common_fields(doc, data):
         "is_active",
         "disabled",
         "embedding_status",
+        "source_version",
+        "archived",
+        "character_count",
+        "diagnostics_status",
+        "diagnostics_message",
     ]:
         if fieldname in ["access_policy", "default_access_policy"]:
             set_if_field(doc, fieldname, linked_policy)
