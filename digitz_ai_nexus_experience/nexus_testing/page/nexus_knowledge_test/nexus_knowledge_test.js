@@ -175,6 +175,9 @@ frappe.pages['nexus-knowledge-test'].on_page_load = function(wrapper) {
                             <button class="btn btn-danger btn-sm" id="nexus_show_failed_tests">
                                 Show Failed
                             </button>
+                            <button class="btn btn-warning btn-sm" id="nexus_show_all_failed_diagnostics">
+                                View All Failed Diagnostics
+                            </button>
 
                             <button class="btn btn-warning btn-sm" id="nexus_run_failed_tests">
                                 Run Failed Tests
@@ -366,9 +369,105 @@ $(document).on('click', '#nexus_history_show_passed', function() {
     filter_execution_history('passed');
 });
 
+$(document).on('click', '#nexus_show_all_failed_diagnostics', function() {
+    show_all_failed_diagnostics();
+});
+
     update_history_count();
 };
 
+
+function show_all_failed_diagnostics() {
+   
+    const failed_entries = [];
+    const seen_titles = new Set();
+
+    nexus_session_run_history.forEach(entry => {
+        if (!entry.passed && !seen_titles.has(entry.title)) {
+            failed_entries.push(entry);
+            seen_titles.add(entry.title);
+        }
+    });
+    
+    if (!failed_entries.length) {
+        frappe.msgprint('No failed diagnostics available in this session.');
+        return;
+    }
+
+    const combined_text = failed_entries.map(entry => {
+        return [
+            `TEST CASE: #${entry.number} — ${entry.title}`,
+            '',
+            'FAILURE REASON',
+            entry.failure_reason || '-',
+            '',
+            'PAYLOAD',
+            JSON.stringify(entry.payload || {}, null, 2),
+            '',
+            'RAW RESULT',
+            JSON.stringify(entry.result || {}, null, 2),
+            '',
+            '============================================================',
+            ''
+        ].join('\n');
+    }).join('\n');
+
+    const dialog = new frappe.ui.Dialog({
+        title: 'All Failed Combined Diagnostics',
+        size: 'extra-large',
+        fields: [
+            {
+                fieldtype: 'HTML',
+                fieldname: 'combined_failed_html'
+            }
+        ]
+    });
+
+    dialog.fields_dict.combined_failed_html.$wrapper.html(`
+        <div class="nexus-popup-block">
+            <div class="nexus-popup-title">
+                Failed Test Diagnostics (${failed_entries.length})
+            </div>
+
+            <div style="margin-bottom:12px;">
+                <button type="button" class="btn btn-primary btn-sm nexus-copy-all-failed-diagnostics">
+                    Copy All Diagnostics
+                </button>
+            </div>
+
+            <pre class="nexus-popup-code nexus-combined-diagnostics-code">${frappe.utils.escape_html(combined_text)}</pre>
+        </div>
+    `);
+
+    dialog.show();
+
+    dialog.$wrapper
+        .find('.nexus-copy-all-failed-diagnostics')
+        .off('click')
+        .on('click', function() {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(combined_text).then(() => {
+                    frappe.show_alert({
+                        message: 'All failed diagnostics copied.',
+                        indicator: 'green'
+                    });
+                }).catch(() => {
+                    frappe.utils.copy_to_clipboard(combined_text);
+                    frappe.show_alert({
+                        message: 'All failed diagnostics copied.',
+                        indicator: 'green'
+                    });
+                });
+            } else {
+                frappe.utils.copy_to_clipboard(combined_text);
+                frappe.show_alert({
+                    message: 'All failed diagnostics copied.',
+                    indicator: 'green'
+                });
+            }
+        });
+}
+
 function filter_execution_history(filter_type='all') {
     $('.nexus-history-actions .btn').removeClass('active');
 
@@ -410,47 +509,7 @@ function filter_execution_history(filter_type='all') {
         `);
     }
 }
-function filter_execution_history(filter_type='all') {
-    $('.nexus-history-actions .btn').removeClass('active');
 
-    if (filter_type === 'failed') {
-        $('#nexus_history_show_failed').addClass('active');
-    } else if (filter_type === 'passed') {
-        $('#nexus_history_show_passed').addClass('active');
-    } else {
-        $('#nexus_history_show_all').addClass('active');
-    }
-
-    let visible_count = 0;
-
-    $('.nexus-history-result-card').each(function() {
-        const $card = $(this);
-
-        let show = true;
-
-        if (filter_type === 'failed') {
-            show = $card.hasClass('failed');
-        } else if (filter_type === 'passed') {
-            show = $card.hasClass('passed');
-        }
-
-        $card.toggle(show);
-
-        if (show) {
-            visible_count += 1;
-        }
-    });
-
-    $('#nexus_history_empty_filter_message').remove();
-
-    if (!visible_count && nexus_session_run_history.length) {
-        $('#nexus_history_feed').append(`
-            <div id="nexus_history_empty_filter_message" class="nexus-history-empty">
-                No ${filter_type} execution result found in this session.
-            </div>
-        `);
-    }
-}
 function open_manual_test_input_dialog() {
     const $form = $('#nexus_manual_test_form_holder .nexus-manual-input-card').detach();
 
@@ -1263,15 +1322,18 @@ function build_result_output_html(title, result, passed, failure_reason, payload
     const result_raw = JSON.stringify(result || {}, null, 2);
 
     const combined_raw = [
-        'FAILURE REASON',
-        failure_reason || '-',
-        '',
-        'PAYLOAD',
-        payload_raw,
-        '',
-        'RAW RESULT',
-        result_raw
-    ].join('\n');
+    'TEST CASE',
+    title || 'Test Result',
+    '',
+    'FAILURE REASON',
+    failure_reason || '-',
+    '',
+    'PAYLOAD',
+    payload_raw,
+    '',
+    'RAW RESULT',
+    result_raw
+].join('\n');
 
     const combined_text = frappe.utils.escape_html(combined_raw);
 
@@ -1814,30 +1876,6 @@ function render_history_feed() {
             ? 'passed'
             : 'all'
 );
-}
-function bind_nexus_history_actions() {
-    $('.nexus-history-toggle').off('click').on('click', function() {
-        $(this).siblings('.nexus-history-details').toggle();
-    });
-
-    $('.nexus-copy-diagnostics').off('click').on('click', function() {
-        const text = $(this).attr('data-copy') || '';
-
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(() => {
-                frappe.show_alert({
-                    message: 'Diagnostics copied to clipboard.',
-                    indicator: 'green'
-                });
-            });
-        } else {
-            frappe.utils.copy_to_clipboard(text);
-            frappe.show_alert({
-                message: 'Diagnostics copied to clipboard.',
-                indicator: 'green'
-            });
-        }
-    });
 }
 
 function render_error(message) {

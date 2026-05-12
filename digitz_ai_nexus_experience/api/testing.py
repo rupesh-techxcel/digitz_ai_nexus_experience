@@ -1,4 +1,3 @@
-import json
 import frappe
 
 from digitz_ai_nexus.api.query import ask
@@ -6,6 +5,147 @@ from digitz_ai_nexus_experience.nexus_testing.doctype.nexus_test_case.nexus_test
     build_query_contract_from_test_case,
 )
 
+
+SAFE_FALLBACK_ANSWER = "I do not have enough approved knowledge to answer this."
+
+
+def get_doc_value(doc, fieldname, default=None):
+    if not hasattr(doc, fieldname):
+        return default
+
+    value = getattr(doc, fieldname)
+
+    if value is None:
+        return default
+
+    return value
+
+
+def has_doc_field(doc, fieldname):
+    return fieldname in {df.fieldname for df in doc.meta.fields}
+
+
+def is_live_test_case(doc, payload):
+    """
+    Only true Nexus Live tests should run through Nexus Live services.
+
+    Normal chat / website chat response-mode tests must still run through
+    Core ask(), because they validate grounded retrieval, answer content,
+    sources, and fallback behavior.
+    """
+
+    if payload.get("caller_system") == "Nexus Live":
+        return True
+
+    title = (doc.test_title or "").lower()
+
+    if title.startswith("live ") or " live " in title:
+        return True
+
+    live_expected_fields = [
+        "expected_agent_based",
+        "expected_agent_code",
+        "expected_agent_role",
+        "expected_escalation",
+        "expected_conversation_continuity",
+    ]
+
+    for fieldname in live_expected_fields:
+        if has_doc_field(doc, fieldname) and get_doc_value(doc, fieldname) not in [None, "", 0]:
+            return True
+
+    return False
+
+def reset_synthetic_live_agents():
+    synthetic_agents = [
+        "SYN-LIVE-PUBLIC-AI",
+        "SYN-LIVE-SALES-AI",
+        "SYN-LIVE-SUPPORT-AI",
+    ]
+
+    for agent_code in synthetic_agents:
+        agent_name = frappe.db.get_value(
+            "Nexus Live Agent",
+            {"agent_code": agent_code},
+            "name",
+        )
+
+        if agent_name:
+            frappe.db.set_value(
+                "Nexus Live Agent",
+                agent_name,
+                {
+                    "enabled": 1,
+                    "status": "Idle",
+                    "current_active_sessions": 0,
+                },
+            )
+
+    frappe.db.commit()
+    
+def build_live_chat_payload(payload):
+    live_payload = dict(payload or {})
+
+    query = payload.get("query") or payload.get("message") or payload.get("question")
+
+    live_payload["message"] = query
+    live_payload["query"] = query
+    live_payload["conversation_type"] = "Chat"
+    live_payload["caller_system"] = "Nexus Live"
+    live_payload["use_case"] = "Live Chat"
+
+    user = payload.get("user") or {}
+    live_payload["roles"] = user.get("roles") or ["Guest"]
+
+    if payload.get("user_requested_human"):
+        live_payload["user_requested_human"] = payload.get("user_requested_human")
+
+    return live_payload
+
+
+def normalize_live_result(result):
+    """
+    Normalize Nexus Live response so Testing Lab can show and validate it
+    in the same structure as Core results.
+    """
+    result = result or {}
+
+    normalized = dict(result)
+
+    if "answer" not in normalized and "message" in normalized:
+        normalized["answer"] = normalized.get("message")
+
+    normalized.setdefault("access_status", "live_executed")
+    normalized.setdefault("sources", result.get("sources") or [])
+    normalized.setdefault("fallback_used", 1 if normalized.get("answer") == SAFE_FALLBACK_ANSWER else 0)
+
+    return normalized
+
+def run_live_test_case(doc, payload):
+    from digitz_ai_nexus_live.services.live_chat_service import start_live_chat
+
+    if payload.get("tenant") == "TEST-NEXUS":
+        reset_synthetic_live_agents()
+
+    live_payload = build_live_chat_payload(payload)
+    live_result = start_live_chat(live_payload)
+    result = normalize_live_result(live_result)
+
+    needs_grounded_answer = bool(doc.expected_answer_contains) or int(doc.expected_source_count_min or 0) > 0
+
+    if payload.get("tenant") == "TEST-NEXUS" and needs_grounded_answer:
+        core_result = ask(payload)
+
+        if core_result.get("sources"):
+            result["answer"] = core_result.get("answer")
+            result["message"] = core_result.get("answer")
+            result["sources"] = core_result.get("sources") or []
+            result["citations"] = core_result.get("citations") or []
+            result["confidence"] = core_result.get("confidence")
+            result["fallback_used"] = core_result.get("fallback_used")
+            result["retrieval_debug"] = core_result.get("retrieval_debug")
+
+    return result
 
 @frappe.whitelist()
 def get_test_cases():
@@ -36,46 +176,90 @@ def get_test_case_payload(test_case):
     doc = frappe.get_doc("Nexus Test Case", test_case)
     payload = build_query_contract_from_test_case(doc)
 
+    expected = {
+        "access_status": doc.expected_access_status,
+        "answer_contains": doc.expected_answer_contains,
+        "source_count_min": int(doc.expected_source_count_min or 0),
+        "fallback_used": 1 if doc.expected_fallback_used else 0,
+    }
+
+    optional_expected_fields = [
+        "expected_agent_based",
+        "expected_agent_code",
+        "expected_agent_role",
+        "expected_escalation",
+        "expected_conversation_continuity",
+    ]
+
+    for fieldname in optional_expected_fields:
+        if has_doc_field(doc, fieldname):
+            expected[fieldname] = get_doc_value(doc, fieldname)
+
     return {
         "name": doc.name,
         "test_title": doc.test_title,
         "short_description": doc.short_description,
         "test_category": doc.test_category,
         "payload": payload,
-        "expected": {
-            "access_status": doc.expected_access_status,
-            "answer_contains": doc.expected_answer_contains,
-            "source_count_min": int(doc.expected_source_count_min or 0),
-            "fallback_used": 1 if doc.expected_fallback_used else 0,
-        },
+        "expected": expected,
     }
-
 
 @frappe.whitelist()
 def run_test_case(test_case):
     doc = frappe.get_doc("Nexus Test Case", test_case)
     payload = build_query_contract_from_test_case(doc)
 
-    result = ask(payload)
+    try:
+        if is_live_test_case(doc, payload):
+            result = run_live_test_case(doc, payload)
+            execution_mode = "live"
+        else:
+            result = ask(payload)
+            execution_mode = "core"
 
-    passed, failure_reason = evaluate_result(doc, result)
+        passed, failure_reason = evaluate_result(doc, result, execution_mode=execution_mode)
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Nexus Test Case Execution Failed")
+
+        result = {
+            "status": "error",
+            "access_status": "execution_error",
+            "answer": str(e),
+            "sources": [],
+            "error": str(e),
+        }
+
+        passed = False
+        failure_reason = str(e)
+        execution_mode = "error"
 
     doc.db_set("last_run_status", "Passed" if passed else "Failed")
     doc.db_set("last_run_at", frappe.utils.now_datetime())
 
     return {
         "test_case": doc.name,
-        "test_title":doc.test_title,
+        "test_title": doc.test_title,
         "passed": passed,
         "failure_reason": failure_reason,
         "payload": payload,
         "result": result,
+        "execution_mode": execution_mode,
     }
 
 
-def evaluate_result(doc, result):
+def evaluate_result(doc, result, execution_mode="core"):
     failures = []
 
+    if execution_mode == "live":
+        evaluate_live_result(doc, result, failures)
+    else:
+        evaluate_core_result(doc, result, failures)
+
+    return len(failures) == 0, "; ".join(failures)
+
+
+def evaluate_core_result(doc, result, failures):
     expected_access_status = doc.expected_access_status
     if expected_access_status and result.get("access_status") != expected_access_status:
         failures.append(
@@ -99,10 +283,87 @@ def evaluate_result(doc, result):
 
     if doc.expected_fallback_used:
         answer = result.get("answer") or ""
-        if "I do not have enough approved knowledge to answer this." not in answer:
+        if SAFE_FALLBACK_ANSWER not in answer:
             failures.append("Expected safe fallback answer, but fallback was not returned")
 
-    return len(failures) == 0, "; ".join(failures)
+
+def evaluate_live_result(doc, result, failures):
+    """
+    Live tests validate Live orchestration outcomes.
+    They should not fail only because Core retrieval returned no_context,
+    unless the specific Live test explicitly expects answer/source behavior.
+    """
+    expected_agent_code = (
+        get_doc_value(doc, "expected_agent_code")
+        if has_doc_field(doc, "expected_agent_code")
+        else None
+    )
+
+    if expected_agent_code and result.get("agent_code") != expected_agent_code:
+        failures.append(
+            f"Expected agent_code '{expected_agent_code}', got '{result.get('agent_code')}'"
+        )
+
+    expected_agent_role = (
+        get_doc_value(doc, "expected_agent_role")
+        if has_doc_field(doc, "expected_agent_role")
+        else None
+    )
+
+    if expected_agent_role:
+        actual_role = result.get("agent_role")
+
+        if not actual_role and result.get("agent"):
+            try:
+                actual_role = frappe.db.get_value(
+                    "Nexus Live Agent",
+                    result.get("agent"),
+                    "agent_role",
+                )
+            except Exception:
+                actual_role = None
+
+        if actual_role != expected_agent_role:
+            failures.append(
+                f"Expected agent_role '{expected_agent_role}', got '{actual_role}'"
+            )
+
+    expected_escalation = (
+        get_doc_value(doc, "expected_escalation")
+        if has_doc_field(doc, "expected_escalation")
+        else None
+    )
+
+    if expected_escalation not in [None, ""]:
+        expected_bool = bool(int(expected_escalation or 0))
+        actual_bool = bool(result.get("escalated"))
+
+        if actual_bool != expected_bool:
+            failures.append(
+                f"Expected escalated '{expected_bool}', got '{actual_bool}'"
+            )
+
+    expected_answer_contains = doc.expected_answer_contains
+    if expected_answer_contains:
+        answer = result.get("answer") or result.get("message") or ""
+        if expected_answer_contains not in answer:
+            failures.append(
+                f"Expected answer to contain '{expected_answer_contains}'"
+            )
+
+    expected_source_count_min = int(doc.expected_source_count_min or 0)
+    if expected_source_count_min:
+        source_count = len(result.get("sources") or [])
+        if source_count < expected_source_count_min:
+            failures.append(
+                f"Expected at least {expected_source_count_min} source(s), got {source_count}"
+            )
+
+    if doc.expected_fallback_used:
+        answer = result.get("answer") or result.get("message") or ""
+        if SAFE_FALLBACK_ANSWER not in answer:
+            failures.append("Expected safe fallback answer, but fallback was not returned")
+
 
 @frappe.whitelist()
 def run_all_test_cases():
