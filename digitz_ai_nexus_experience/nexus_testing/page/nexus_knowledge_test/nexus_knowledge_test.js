@@ -8,7 +8,7 @@ frappe.pages['nexus-knowledge-test'].on_page_load = function(wrapper) {
 
     const page = frappe.ui.make_app_page({
         parent: wrapper,
-        title: 'Knowledge Testing Lab',
+        title: 'Nexus Validation Lab',
         single_column: true
     });
 
@@ -18,11 +18,13 @@ frappe.pages['nexus-knowledge-test'].on_page_load = function(wrapper) {
             <div class="nexus-lab-hero">
                 <div>
                     <div class="nexus-lab-badge">DIGITZ AI Nexus</div>
-                    <h2>Knowledge Testing Lab</h2>
-                    <p>
-                        Validate AI answers using controlled enterprise knowledge, access policies,
-                        Business Units, Projects, response behavior modes, and retrieval intelligence.
-                    </p>
+                    <h2>Nexus Intelligence Validation Lab</h2>
+    
+                        <p>
+                            Enterprise validation workspace for AI retrieval, grounding, governance,
+                            runtime orchestration, operational behavior, and interaction intelligence.
+                        </p>
+    
                 </div>
             </div>
 
@@ -731,7 +733,7 @@ function build_payload() {
         query: get_value('nexus_question'),
         top_k: cint(get_value('nexus_top_k') || 5),
         use_case: get_value('nexus_use_case'),
-        caller_system: 'Knowledge Testing Lab',
+        caller_system: 'Nexus Intelligence Validation Lab',
         user: {
             roles: roles.length ? roles : ['Guest']
         }
