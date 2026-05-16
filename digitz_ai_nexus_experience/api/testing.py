@@ -24,15 +24,31 @@ def get_doc_value(doc, fieldname, default=None):
 def has_doc_field(doc, fieldname):
     return fieldname in {df.fieldname for df in doc.meta.fields}
 
+def is_administration_test_case(doc, payload=None):
+    payload = payload or {}
 
+    category = (doc.test_category or "").strip().lower()
+    title = (doc.test_title or "").strip().lower()
+
+    return (
+        category in ("administration", "administration testing")
+        or title.startswith("administration ")
+        or " administration " in title
+    )
+    
 def is_live_test_case(doc, payload):
     """
     Only true Nexus Live tests should run through Nexus Live services.
 
-    Normal chat / website chat response-mode tests must still run through
-    Core ask(), because they validate grounded retrieval, answer content,
-    sources, and fallback behavior.
+    Administration tests may contain words like "Live Defaults",
+    but they are platform administration validation tests and should not
+    be routed to Live Chat runtime.
     """
+
+    payload = payload or {}
+
+    if is_administration_test_case(doc, payload):
+        return False
 
     if payload.get("caller_system") == "Nexus Live":
         return True
@@ -55,34 +71,113 @@ def is_live_test_case(doc, payload):
             return True
 
     return False
-
 def reset_synthetic_live_agents():
-    synthetic_agents = [
-        "SYN-LIVE-PUBLIC-AI",
-        "SYN-LIVE-SALES-AI",
-        "SYN-LIVE-SUPPORT-AI",
-    ]
+    """
+    Reset all synthetic Live agents so Platform Validation Lab tests are repeatable.
 
-    for agent_code in synthetic_agents:
-        agent_name = frappe.db.get_value(
-            "Nexus Live Agent",
-            {"agent_code": agent_code},
-            "name",
-        )
+    Scoped only to synthetic agents:
+    agent_code like 'SYN-LIVE-%'
 
-        if agent_name:
+    Important:
+    Keep status as 'Idle' because Live routing expects an approved idle AI agent.
+
+    Also align synthetic agents to the synthetic website chat channel so
+    platform tests do not fail because of an old default_channel value such
+    as WEBSITE-CHAT.
+    """
+    if not frappe.db.exists("DocType", "Nexus Live Agent"):
+        return
+
+    meta_fields = {
+        df.fieldname
+        for df in frappe.get_meta("Nexus Live Agent").fields
+    }
+
+    synthetic_chat_channel = None
+
+    if frappe.db.exists("Nexus Live Channel", "SYN-WEBSITE-CHAT"):
+        synthetic_chat_channel = "SYN-WEBSITE-CHAT"
+
+    agents = frappe.get_all(
+        "Nexus Live Agent",
+        filters={
+            "agent_code": ["like", "SYN-LIVE-%"],
+        },
+        fields=["name", "agent_code"],
+        limit_page_length=500,
+    )
+
+    for agent in agents:
+        values = {}
+
+        if "enabled" in meta_fields:
+            values["enabled"] = 1
+
+        if "status" in meta_fields:
+            values["status"] = "Idle"
+
+        if "current_active_sessions" in meta_fields:
+            values["current_active_sessions"] = 0
+
+        if "approval_status" in meta_fields:
+            values["approval_status"] = "Approved"
+
+        if "onboarding_status" in meta_fields:
+            values["onboarding_status"] = "Approved"
+
+        if "availability_status" in meta_fields:
+            values["availability_status"] = "Available"
+
+        if "visibility" in meta_fields:
+            values["visibility"] = "Public"
+
+        if "rejection_reason" in meta_fields:
+            values["rejection_reason"] = None
+
+        if "last_status_change" in meta_fields:
+            values["last_status_change"] = frappe.utils.now_datetime()
+
+        if "disabled" in meta_fields:
+            values["disabled"] = 0
+
+        if "default_channel" in meta_fields and synthetic_chat_channel:
+            values["default_channel"] = synthetic_chat_channel
+
+        if values:
             frappe.db.set_value(
                 "Nexus Live Agent",
-                agent_name,
-                {
-                    "enabled": 1,
-                    "status": "Idle",
-                    "current_active_sessions": 0,
-                },
+                agent.name,
+                values,
+                update_modified=False,
             )
 
     frappe.db.commit()
-    
+def prepare_platform_test_runtime(doc, payload):
+    """
+    Prepare runtime state before executing saved Platform Validation Lab tests.
+
+    Philosophy:
+    - Saved platform tests should run against their explicit test tenant.
+    - Live synthetic tests should be repeatable.
+    - Reset must only affect synthetic Live agents.
+    """
+    payload = payload or {}
+
+    tenant = payload.get("tenant")
+    title = (doc.test_title or "").lower()
+
+    is_test_tenant = tenant in ("TEST-NEXUS", "TEST-NEXUS-ALT")
+    is_live_validation = is_live_test_case(doc, payload)
+    is_synthetic_live_title = (
+        title.startswith("live ")
+        or " live " in title
+        or "behaviour" in title
+        or "behavior" in title
+    )
+
+    if is_test_tenant or is_live_validation or is_synthetic_live_title:
+        reset_synthetic_live_agents()     
+           
 def build_live_chat_payload(payload):
     live_payload = dict(payload or {})
 
@@ -102,6 +197,42 @@ def build_live_chat_payload(payload):
 
     return live_payload
 
+def build_live_qa_payload(payload):
+    live_payload = dict(payload or {})
+
+    query = payload.get("query") or payload.get("question") or payload.get("message")
+
+    live_payload["question"] = query
+    live_payload["query"] = query
+    live_payload["conversation_type"] = "Q&A"
+    live_payload["caller_system"] = "Nexus Live"
+    live_payload["use_case"] = "Live Q And A"
+
+    user = payload.get("user") or {}
+    live_payload["roles"] = user.get("roles") or ["Guest"]
+
+    if payload.get("user_requested_human"):
+        live_payload["user_requested_human"] = payload.get("user_requested_human")
+
+    return live_payload
+
+def should_run_live_qa(doc, payload):
+    payload = payload or {}
+
+    title = (doc.test_title or "").lower()
+    use_case = (payload.get("use_case") or "").lower()
+    response_mode = (payload.get("response_mode") or "").lower()
+
+    if "q and a" in title or "q&a" in title:
+        return True
+
+    if use_case in ("qa", "q&a", "live q and a", "live qa"):
+        return True
+
+    if response_mode == "qa":
+        return True
+
+    return False
 
 def normalize_live_result(result):
     """
@@ -122,13 +253,17 @@ def normalize_live_result(result):
     return normalized
 
 def run_live_test_case(doc, payload):
-    from digitz_ai_nexus_live.services.live_chat_service import start_live_chat
+    if should_run_live_qa(doc, payload):
+        from digitz_ai_nexus_live.services.live_qa_service import ask_live_question
 
-    if payload.get("tenant") == "TEST-NEXUS":
-        reset_synthetic_live_agents()
+        live_payload = build_live_qa_payload(payload)
+        live_result = ask_live_question(live_payload)
+    else:
+        from digitz_ai_nexus_live.services.live_chat_service import start_live_chat
 
-    live_payload = build_live_chat_payload(payload)
-    live_result = start_live_chat(live_payload)
+        live_payload = build_live_chat_payload(payload)
+        live_result = start_live_chat(live_payload)
+
     result = normalize_live_result(live_result)
 
     needs_grounded_answer = bool(doc.expected_answer_contains) or int(doc.expected_source_count_min or 0) > 0
@@ -209,6 +344,8 @@ def run_test_case(test_case):
     doc = frappe.get_doc("Nexus Test Case", test_case)
     payload = build_query_contract_from_test_case(doc)
 
+    prepare_platform_test_runtime(doc, payload)
+
     try:
         if is_live_test_case(doc, payload):
             result = run_live_test_case(doc, payload)
@@ -221,6 +358,16 @@ def run_test_case(test_case):
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Nexus Test Case Execution Failed")
+
+        # Prevent caught frappe.throw() messages from opening modal popups
+        # during batch execution in the Validation Lab UI.
+        try:
+            frappe.clear_messages()
+        except Exception:
+            pass
+
+        if hasattr(frappe.local, "message_log"):
+            frappe.local.message_log = []
 
         result = {
             "status": "error",

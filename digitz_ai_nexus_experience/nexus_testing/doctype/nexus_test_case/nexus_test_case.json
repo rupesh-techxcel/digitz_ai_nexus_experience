@@ -59,7 +59,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Test Category",
-   "options": "Public Knowledge\nAccess Control\nBusiness Unit Scope\nProject Scope\nFallback\nResponse Behaviour\nGovernance\nCustom"
+   "options": "Public Knowledge\nAccess Control\nBusiness Unit Scope\nProject Scope\nFallback\nResponse Behaviour\nGovernance\nAdministration\nCustom"
   },
   {
    "fieldname": "short_description",

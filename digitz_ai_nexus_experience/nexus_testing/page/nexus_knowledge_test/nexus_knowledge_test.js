@@ -940,6 +940,7 @@ function get_group_description(group) {
         'Response Behaviour': 'Answer mode, response style, Q&A behavior, and chatbot behavior validation.',
         'Governance': 'Governance, diagnostics, retrieval readiness, quality, and ingestion validation.',
         'Nexus Live Operational Validation': 'Live Q&A, agent-based chat, routing, escalation, and conversation continuity.',
+        'Administration': 'Tenant context, ecosystem defaults, onboarding readiness, and platform administration validation.',
         'Custom': 'Custom validation scenarios.',
         'General Validation': 'General test cases not assigned to a specific group.'
     };
