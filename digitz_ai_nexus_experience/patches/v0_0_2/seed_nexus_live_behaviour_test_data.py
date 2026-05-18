@@ -1,3 +1,4 @@
+# Live Behaviour test data seeding for tenant-aware platform tests.
 import frappe
 
 UPDATE_EXISTING = True
@@ -13,7 +14,7 @@ LIVE = {
 
     "sales_agent": "LIVE-TEST-SALES-AI",
     "support_agent": "LIVE-TEST-SUPPORT-AI",
-    "public_agent": "LIVE-TEST-PUBLIC-AI",
+    "public_agent": "SYN-LIVE-PUBLIC-AI",
     "no_escalation_agent": "LIVE-TEST-NO-ESCALATION-AI",
     "legacy_profile_agent": "LIVE-TEST-LEGACY-PROFILE-AI",
 

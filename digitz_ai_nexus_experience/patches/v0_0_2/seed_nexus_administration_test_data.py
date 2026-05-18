@@ -1,3 +1,4 @@
+# Administration test data seeding for tenant-aware platform tests.
 import frappe
 
 from digitz_ai_nexus.services.tenant_context import set_user_context

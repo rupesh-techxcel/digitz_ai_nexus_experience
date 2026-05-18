@@ -74,6 +74,46 @@ frappe.pages['nexus-knowledge-test'].on_page_load = function(wrapper) {
                     </button>
                 </div>
 
+
+                                <div class="nexus-lab-card nexus-seed-control-card">
+                    <div class="nexus-seed-head">
+                        <div>
+                            <div class="nexus-card-title">Synthetic Dataset Control</div>
+                            <p>
+                                Seed, clear, or reset the synthetic test dataset used by the Platform Testing Lab.
+                                This section calls the data seed files on demand. Test case definitions are not cleared
+                                by the normal dataset clear action.
+                            </p>
+                        </div>
+
+                        <button class="btn btn-default btn-sm" id="nexus_refresh_seed_status">
+                            Refresh Status
+                        </button>
+                    </div>
+
+                    <div id="nexus_seed_status" class="nexus-seed-status">
+                        Loading synthetic dataset status...
+                    </div>
+
+                    <div class="nexus-seed-actions">
+                        <button class="btn btn-primary btn-sm" id="nexus_seed_dataset">
+                            Seed Dataset
+                        </button>
+
+                        <button class="btn btn-warning btn-sm" id="nexus_reset_dataset">
+                            Reset Dataset
+                        </button>
+
+                        <button class="btn btn-danger btn-sm" id="nexus_clear_dataset">
+                            Clear Dataset
+                        </button>
+
+                        <button class="btn btn-default btn-sm" id="nexus_clear_execution_logs">
+                            Clear Execution Logs
+                        </button>
+                    </div>
+                </div>
+
                 <div id="nexus_manual_test_form_holder" style="display:none;">
                     <div class="nexus-lab-card nexus-manual-input-card">
                         <div class="nexus-card-title">Manual Test Input</div>
@@ -314,6 +354,7 @@ frappe.pages['nexus-knowledge-test'].on_page_load = function(wrapper) {
 
     inject_nexus_lab_css();
     load_test_cases();
+    load_synthetic_dataset_status();
 
     $('.nexus-tab-btn').on('click', function() {
         switch_nexus_tab($(this).data('tab'));
@@ -359,21 +400,46 @@ frappe.pages['nexus-knowledge-test'].on_page_load = function(wrapper) {
         load_selected_test_case_to_observatory(true);
     });
 
+        $('#nexus_refresh_seed_status').off('click').on('click', function() {
+        console.log('[Nexus Seed Control] Refresh Status clicked');
+        load_synthetic_dataset_status();
+    });
+
+    $('#nexus_seed_dataset').off('click').on('click', function() {
+        console.log('[Nexus Seed Control] Seed Dataset clicked');
+        seed_synthetic_dataset();
+    });
+
+    $('#nexus_clear_dataset').off('click').on('click', function() {
+        console.log('[Nexus Seed Control] Clear Dataset clicked');
+        clear_synthetic_dataset();
+    });
+
+    $('#nexus_reset_dataset').off('click').on('click', function() {
+        console.log('[Nexus Seed Control] Reset Dataset clicked');
+        reset_synthetic_dataset();
+    });
+
+    $('#nexus_clear_execution_logs').off('click').on('click', function() {
+        console.log('[Nexus Seed Control] Clear Execution Logs clicked');
+        clear_execution_logs();
+    });
+
     $(document).on('click', '#nexus_history_show_all', function() {
-    filter_execution_history('all');
-});
+        filter_execution_history('all');
+    });
 
-$(document).on('click', '#nexus_history_show_failed', function() {
-    filter_execution_history('failed');
-});
+    $(document).on('click', '#nexus_history_show_failed', function() {
+        filter_execution_history('failed');
+    });
 
-$(document).on('click', '#nexus_history_show_passed', function() {
-    filter_execution_history('passed');
-});
+    $(document).on('click', '#nexus_history_show_passed', function() {
+        filter_execution_history('passed');
+    });
 
-$(document).on('click', '#nexus_show_all_failed_diagnostics', function() {
-    show_all_failed_diagnostics();
-});
+    $(document).on('click', '#nexus_show_all_failed_diagnostics', function() {
+        show_all_failed_diagnostics();
+    });
 
     update_history_count();
 };
@@ -621,6 +687,14 @@ function show_failed_test_cases() {
     }
 }
 
+function set_seed_buttons_disabled(disabled) {
+    $('#nexus_seed_dataset').prop('disabled', disabled);
+    $('#nexus_clear_dataset').prop('disabled', disabled);
+    $('#nexus_reset_dataset').prop('disabled', disabled);
+    $('#nexus_clear_execution_logs').prop('disabled', disabled);
+    $('#nexus_refresh_seed_status').prop('disabled', disabled);
+}
+
 function set_execution_buttons_disabled(disabled) {
     $('#nexus_run_all_tests').prop('disabled', disabled);
     $('#nexus_run_failed_tests').prop('disabled', disabled);
@@ -629,6 +703,559 @@ function set_execution_buttons_disabled(disabled) {
     $('.nexus-run-test-case').prop('disabled', disabled);
     $('#nexus_run_test').prop('disabled', disabled);
     $('.nexus-observe-test-case').prop('disabled', disabled);
+
+    set_seed_buttons_disabled(disabled);
+}
+
+function load_synthetic_dataset_status() {
+    console.log('[Nexus Seed Control] Loading synthetic dataset status...');
+
+    $('#nexus_seed_status').html(`
+        <div class="nexus-seed-loading">
+            Loading synthetic dataset status...
+        </div>
+    `);
+
+    frappe.call({
+        method: 'digitz_ai_nexus_experience.api.testing_seed_control.get_synthetic_dataset_status',
+        freeze: false,
+        callback: function(r) {
+            console.log('[Nexus Seed Control] Status API response:', r);
+
+            if (!r.message || !r.message.success) {
+                console.warn('[Nexus Seed Control] Status API returned unsuccessful response:', r.message);
+
+                $('#nexus_seed_status').html(`
+                    <div class="nexus-seed-warning">
+                        Unable to load synthetic dataset status. Check browser console and server logs.
+                    </div>
+                `);
+
+                frappe.show_alert({
+                    message: 'Unable to load synthetic dataset status.',
+                    indicator: 'orange'
+                });
+
+                return;
+            }
+
+            render_synthetic_dataset_status(r.message);
+
+            frappe.show_alert({
+                message: 'Synthetic dataset status refreshed.',
+                indicator: 'blue'
+            });
+        },
+        error: function(err) {
+            console.error('[Nexus Seed Control] Status API failed:', err);
+
+            $('#nexus_seed_status').html(`
+                <div class="nexus-seed-danger">
+                    ${frappe.utils.escape_html(err.message || 'Failed to load synthetic dataset status.')}
+                </div>
+            `);
+
+            frappe.msgprint({
+                title: 'Dataset Status Failed',
+                indicator: 'red',
+                message: err.message || 'Failed to load synthetic dataset status.'
+            });
+        }
+    });
+}
+
+function render_synthetic_dataset_status(data) {
+    console.log('[Nexus Seed Control] Rendering dataset status:', data);
+
+    const counts = data.counts || {};
+    const modules = data.seed_modules || [];
+
+    const module_html = modules.map(item => {
+        return `
+            <div class="${item.available ? 'available' : 'missing'}">
+                <span>${frappe.utils.escape_html(item.label || item.module)}</span>
+                <b>${item.available ? 'Available' : 'Missing'}</b>
+            </div>
+        `;
+    }).join('');
+
+    $('#nexus_seed_status').html(`
+        <div class="nexus-seed-status-grid">
+            <div>
+                <label>Seed Modules</label>
+                <strong>${counts.seed_modules_available || 0}/${counts.seed_modules_total || 0}</strong>
+            </div>
+
+            <div>
+                <label>Knowledge Units</label>
+                <strong>${counts.knowledge_units || 0}</strong>
+            </div>
+
+            <div>
+                <label>Knowledge Chunks</label>
+                <strong>${counts.knowledge_chunks || 0}</strong>
+            </div>
+
+            <div>
+                <label>Knowledge Sources</label>
+                <strong>${counts.knowledge_sources || 0}</strong>
+            </div>
+
+            <div>
+                <label>Live Agents</label>
+                <strong>${counts.live_agents || 0}</strong>
+            </div>
+
+            <div>
+                <label>Live Channels</label>
+                <strong>${counts.live_channels || 0}</strong>
+            </div>
+
+            <div>
+                <label>Queues</label>
+                <strong>${counts.agent_queues || 0}</strong>
+            </div>
+
+            <div>
+                <label>Behaviours</label>
+                <strong>${counts.ai_behaviours || 0}</strong>
+            </div>
+
+            <div>
+                <label>Query Logs</label>
+                <strong>${counts.query_logs || 0}</strong>
+            </div>
+
+            <div>
+                <label>Test Runs</label>
+                <strong>${counts.test_runs || 0}</strong>
+            </div>
+        </div>
+
+        <div class="nexus-seed-module-list">
+            ${module_html || `
+                <div class="missing">
+                    <span>No seed module status returned</span>
+                    <b>Missing</b>
+                </div>
+            `}
+        </div>
+    `);
+}
+
+function seed_synthetic_dataset() {
+    console.log('[Nexus Seed Control] seed_synthetic_dataset() invoked');
+
+    frappe.confirm(
+        'This will seed / refresh the synthetic test dataset from the configured data seed files. Continue?',
+        function() {
+            console.log('[Nexus Seed Control] Seed confirmed by user');
+
+            set_seed_buttons_disabled(true);
+
+            $('#nexus_seed_status').html(`
+                <div class="nexus-seed-loading">
+                    Seeding synthetic dataset... Please wait.
+                </div>
+            `);
+
+            frappe.show_alert({
+                message: 'Synthetic dataset seeding started.',
+                indicator: 'blue'
+            });
+
+            frappe.call({
+                method: 'digitz_ai_nexus_experience.api.testing_seed_control.seed_synthetic_dataset',
+                freeze: true,
+                freeze_message: 'Seeding synthetic test dataset...',
+                callback: function(r) {
+                    console.log('[Nexus Seed Control] Seed API response:', r);
+
+                    set_seed_buttons_disabled(false);
+
+                    if (!r.message || !r.message.success) {
+                        console.warn('[Nexus Seed Control] Seed API unsuccessful:', r.message);
+
+                        frappe.msgprint({
+                            title: 'Seed Dataset Failed',
+                            indicator: 'red',
+                            message: (r.message && r.message.message) || 'Synthetic dataset seed failed.'
+                        });
+
+                        load_synthetic_dataset_status();
+                        return;
+                    }
+
+                    frappe.show_alert({
+                        message: r.message.message || 'Synthetic dataset seeded successfully.',
+                        indicator: 'green'
+                    });
+
+                    show_dataset_action_result('Seed Dataset Result', r.message);
+
+                    if (r.message.status) {
+                        render_synthetic_dataset_status(r.message.status);
+                    } else {
+                        load_synthetic_dataset_status();
+                    }
+
+                    load_test_cases();
+                },
+                error: function(err) {
+                    console.error('[Nexus Seed Control] Seed API failed:', err);
+
+                    set_seed_buttons_disabled(false);
+
+                    frappe.msgprint({
+                        title: 'Seed Dataset Failed',
+                        indicator: 'red',
+                        message: err.message || 'Synthetic dataset seed failed. Check console and server error logs.'
+                    });
+
+                    load_synthetic_dataset_status();
+                }
+            });
+        },
+        function() {
+            console.log('[Nexus Seed Control] Seed cancelled by user');
+            frappe.show_alert({
+                message: 'Dataset seed cancelled.',
+                indicator: 'orange'
+            });
+        }
+    );
+}
+
+function clear_synthetic_dataset() {
+    console.log('[Nexus Seed Control] clear_synthetic_dataset() invoked');
+
+    frappe.confirm(
+        'This will clear seeded synthetic runtime / knowledge / Live data. Test case definitions will not be cleared. Continue?',
+        function() {
+            frappe.confirm(
+                'Final confirmation: clear the synthetic dataset now?',
+                function() {
+                    console.log('[Nexus Seed Control] Clear confirmed by user');
+
+                    set_seed_buttons_disabled(true);
+
+                    $('#nexus_seed_status').html(`
+                        <div class="nexus-seed-loading">
+                            Clearing synthetic dataset... Please wait.
+                        </div>
+                    `);
+
+                    frappe.show_alert({
+                        message: 'Synthetic dataset clearing started.',
+                        indicator: 'orange'
+                    });
+
+                    frappe.call({
+                        method: 'digitz_ai_nexus_experience.api.testing_seed_control.clear_synthetic_dataset',
+                        freeze: true,
+                        freeze_message: 'Clearing synthetic test dataset...',
+                        callback: function(r) {
+                            console.log('[Nexus Seed Control] Clear API response:', r);
+
+                            set_seed_buttons_disabled(false);
+
+                            if (!r.message || !r.message.success) {
+                                console.warn('[Nexus Seed Control] Clear API unsuccessful:', r.message);
+
+                                frappe.msgprint({
+                                    title: 'Clear Dataset Failed',
+                                    indicator: 'red',
+                                    message: (r.message && r.message.message) || 'Synthetic dataset clear failed.'
+                                });
+
+                                load_synthetic_dataset_status();
+                                return;
+                            }
+
+                            const deleted_count = r.message.deleted_count || 0;
+                            const skipped_count = r.message.skipped_count || 0;
+
+                            frappe.show_alert({
+                                message: `Synthetic dataset cleared. Deleted: ${deleted_count}, Skipped: ${skipped_count}`,
+                                indicator: skipped_count ? 'orange' : 'green'
+                            });
+
+                            show_dataset_action_result('Clear Dataset Result', r.message);
+
+                            if (r.message.status) {
+                                render_synthetic_dataset_status(r.message.status);
+                            } else {
+                                load_synthetic_dataset_status();
+                            }
+
+                            load_test_cases();
+                        },
+                        error: function(err) {
+                            console.error('[Nexus Seed Control] Clear API failed:', err);
+
+                            set_seed_buttons_disabled(false);
+
+                            frappe.msgprint({
+                                title: 'Clear Dataset Failed',
+                                indicator: 'red',
+                                message: err.message || 'Synthetic dataset clear failed. Check console and server error logs.'
+                            });
+
+                            load_synthetic_dataset_status();
+                        }
+                    });
+                },
+                function() {
+                    console.log('[Nexus Seed Control] Clear final confirmation cancelled');
+                    frappe.show_alert({
+                        message: 'Dataset clear cancelled.',
+                        indicator: 'orange'
+                    });
+                }
+            );
+        },
+        function() {
+            console.log('[Nexus Seed Control] Clear cancelled by user');
+            frappe.show_alert({
+                message: 'Dataset clear cancelled.',
+                indicator: 'orange'
+            });
+        }
+    );
+}
+
+function reset_synthetic_dataset() {
+    console.log('[Nexus Seed Control] reset_synthetic_dataset() invoked');
+
+    frappe.confirm(
+        'This will clear seeded synthetic data first, then seed it again from the configured data seed files. Continue?',
+        function() {
+            frappe.confirm(
+                'Final confirmation: reset the synthetic dataset now?',
+                function() {
+                    console.log('[Nexus Seed Control] Reset confirmed by user');
+
+                    set_seed_buttons_disabled(true);
+
+                    $('#nexus_seed_status').html(`
+                        <div class="nexus-seed-loading">
+                            Resetting synthetic dataset... Please wait.
+                        </div>
+                    `);
+
+                    frappe.show_alert({
+                        message: 'Synthetic dataset reset started.',
+                        indicator: 'orange'
+                    });
+
+                    frappe.call({
+                        method: 'digitz_ai_nexus_experience.api.testing_seed_control.reset_synthetic_dataset',
+                        freeze: true,
+                        freeze_message: 'Resetting synthetic test dataset...',
+                        callback: function(r) {
+                            console.log('[Nexus Seed Control] Reset API response:', r);
+
+                            set_seed_buttons_disabled(false);
+
+                            if (!r.message || !r.message.success) {
+                                console.warn('[Nexus Seed Control] Reset API unsuccessful:', r.message);
+
+                                frappe.msgprint({
+                                    title: 'Reset Dataset Failed',
+                                    indicator: 'red',
+                                    message: (r.message && r.message.message) || 'Synthetic dataset reset failed.'
+                                });
+
+                                load_synthetic_dataset_status();
+                                return;
+                            }
+
+                            frappe.show_alert({
+                                message: r.message.message || 'Synthetic dataset reset completed.',
+                                indicator: 'green'
+                            });
+
+                            show_dataset_action_result('Reset Dataset Result', r.message);
+
+                            if (r.message.status) {
+                                render_synthetic_dataset_status(r.message.status);
+                            } else {
+                                load_synthetic_dataset_status();
+                            }
+
+                            load_test_cases();
+                        },
+                        error: function(err) {
+                            console.error('[Nexus Seed Control] Reset API failed:', err);
+
+                            set_seed_buttons_disabled(false);
+
+                            frappe.msgprint({
+                                title: 'Reset Dataset Failed',
+                                indicator: 'red',
+                                message: err.message || 'Synthetic dataset reset failed. Check console and server error logs.'
+                            });
+
+                            load_synthetic_dataset_status();
+                        }
+                    });
+                },
+                function() {
+                    console.log('[Nexus Seed Control] Reset final confirmation cancelled');
+                    frappe.show_alert({
+                        message: 'Dataset reset cancelled.',
+                        indicator: 'orange'
+                    });
+                }
+            );
+        },
+        function() {
+            console.log('[Nexus Seed Control] Reset cancelled by user');
+            frappe.show_alert({
+                message: 'Dataset reset cancelled.',
+                indicator: 'orange'
+            });
+        }
+    );
+}
+
+function clear_execution_logs() {
+    console.log('[Nexus Seed Control] clear_execution_logs() invoked');
+
+    frappe.confirm(
+        'This will clear synthetic execution logs and query logs only. Seed data will remain. Continue?',
+        function() {
+            console.log('[Nexus Seed Control] Clear logs confirmed by user');
+
+            set_seed_buttons_disabled(true);
+
+            frappe.show_alert({
+                message: 'Clearing synthetic execution logs...',
+                indicator: 'blue'
+            });
+
+            frappe.call({
+                method: 'digitz_ai_nexus_experience.api.testing_seed_control.clear_execution_logs',
+                freeze: true,
+                freeze_message: 'Clearing execution logs...',
+                callback: function(r) {
+                    console.log('[Nexus Seed Control] Clear logs API response:', r);
+
+                    set_seed_buttons_disabled(false);
+
+                    if (!r.message || !r.message.success) {
+                        console.warn('[Nexus Seed Control] Clear logs API unsuccessful:', r.message);
+
+                        frappe.msgprint({
+                            title: 'Clear Execution Logs Failed',
+                            indicator: 'red',
+                            message: (r.message && r.message.message) || 'Execution log clear failed.'
+                        });
+
+                        load_synthetic_dataset_status();
+                        return;
+                    }
+
+                    frappe.show_alert({
+                        message: `${r.message.message || 'Execution logs cleared.'} Deleted: ${r.message.deleted_count || 0}`,
+                        indicator: 'green'
+                    });
+
+                    show_dataset_action_result('Clear Execution Logs Result', r.message);
+
+                    if (r.message.status) {
+                        render_synthetic_dataset_status(r.message.status);
+                    } else {
+                        load_synthetic_dataset_status();
+                    }
+                },
+                error: function(err) {
+                    console.error('[Nexus Seed Control] Clear logs API failed:', err);
+
+                    set_seed_buttons_disabled(false);
+
+                    frappe.msgprint({
+                        title: 'Clear Execution Logs Failed',
+                        indicator: 'red',
+                        message: err.message || 'Execution log clear failed. Check console and server error logs.'
+                    });
+
+                    load_synthetic_dataset_status();
+                }
+            });
+        },
+        function() {
+            console.log('[Nexus Seed Control] Clear logs cancelled by user');
+            frappe.show_alert({
+                message: 'Execution log clear cancelled.',
+                indicator: 'orange'
+            });
+        }
+    );
+}
+
+function show_dataset_action_result(title, data) {
+    console.log(`[Nexus Seed Control] ${title}:`, data);
+
+    const deleted = data.deleted || [];
+    const skipped = data.skipped || [];
+    const results = data.results || [];
+
+    const result_text = JSON.stringify({
+        message: data.message,
+        deleted_count: data.deleted_count || 0,
+        skipped_count: data.skipped_count || 0,
+        seed_results: results,
+        deleted: deleted,
+        skipped: skipped
+    }, null, 2);
+
+    const dialog = new frappe.ui.Dialog({
+        title: title,
+        size: 'large',
+        fields: [
+            {
+                fieldtype: 'HTML',
+                fieldname: 'result_html'
+            }
+        ]
+    });
+
+    dialog.fields_dict.result_html.$wrapper.html(`
+        <div class="nexus-popup-block">
+            <div class="nexus-popup-title">Dataset Action Summary</div>
+
+            <div style="margin-bottom:12px;">
+                <button type="button" class="btn btn-primary btn-sm nexus-copy-dataset-action-result">
+                    Copy Result
+                </button>
+            </div>
+
+            <pre class="nexus-popup-code nexus-combined-diagnostics-code">${frappe.utils.escape_html(result_text)}</pre>
+        </div>
+    `);
+
+    dialog.show();
+
+    dialog.$wrapper
+        .find('.nexus-copy-dataset-action-result')
+        .off('click')
+        .on('click', function() {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(result_text).then(() => {
+                    frappe.show_alert({
+                        message: 'Dataset action result copied.',
+                        indicator: 'green'
+                    });
+                });
+            } else {
+                frappe.utils.copy_to_clipboard(result_text);
+                frappe.show_alert({
+                    message: 'Dataset action result copied.',
+                    indicator: 'green'
+                });
+            }
+        });
 }
 
 function run_retrieval_evaluation() {
@@ -2173,6 +2800,147 @@ function inject_nexus_lab_css() {
                 background: linear-gradient(90deg, #e0a62f, #f4ca64);
             }
 
+            .nexus-seed-control-card {
+                margin-bottom: 18px;
+                background:
+                    radial-gradient(circle at 98% 0%, rgba(224,166,47,.10), transparent 26%),
+                    linear-gradient(180deg, #ffffff, #f8fbff);
+            }
+
+            .nexus-seed-head {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: 14px;
+                margin-bottom: 14px;
+            }
+
+            .nexus-seed-head .nexus-card-title {
+                margin-bottom: 8px;
+            }
+
+            .nexus-seed-head p {
+                margin: 0;
+                color: #53688f;
+                font-size: 13px;
+                line-height: 1.55;
+                font-weight: 750;
+            }
+
+            .nexus-seed-status {
+                margin-bottom: 14px;
+            }
+
+            .nexus-seed-status-grid {
+                display: grid;
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+                gap: 10px;
+                margin-bottom: 12px;
+            }
+
+            .nexus-seed-status-grid > div {
+                padding: 13px 14px;
+                border-radius: 15px;
+                background: #f8fbff;
+                border: 1px solid rgba(77,163,255,.22);
+            }
+
+            .nexus-seed-status-grid label {
+                display: block;
+                color: #53688f;
+                font-size: 11px;
+                font-weight: 900;
+                text-transform: uppercase;
+                margin-bottom: 5px;
+            }
+
+            .nexus-seed-status-grid strong {
+                color: #102b67;
+                font-size: 20px;
+                font-weight: 950;
+            }
+
+            .nexus-seed-module-list {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 8px;
+            }
+
+            .nexus-seed-module-list > div {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                padding: 10px 12px;
+                border-radius: 14px;
+                background: #ffffff;
+                border: 1px solid rgba(77,163,255,.18);
+            }
+
+            .nexus-seed-module-list span {
+                color: #27416f;
+                font-size: 12px;
+                font-weight: 850;
+            }
+
+            .nexus-seed-module-list b {
+                padding: 5px 9px;
+                border-radius: 999px;
+                font-size: 11px;
+                font-weight: 900;
+            }
+
+            .nexus-seed-module-list .available b {
+                background: #ecfdf3;
+                color: #16794c;
+                border: 1px solid #bdebd2;
+            }
+
+            .nexus-seed-module-list .missing b {
+                background: #fff0f0;
+                color: #b42318;
+                border: 1px solid #ffd1d1;
+            }
+
+            .nexus-seed-actions {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: flex-end;
+                gap: 10px;
+            }
+
+            .nexus-seed-actions .btn,
+            #nexus_refresh_seed_status {
+                border-radius: 999px;
+                font-weight: 900;
+            }
+
+            .nexus-seed-loading,
+            .nexus-seed-warning,
+            .nexus-seed-danger {
+                padding: 14px;
+                border-radius: 15px;
+                font-weight: 900;
+            }
+
+            .nexus-seed-loading {
+                background: #eef6ff;
+                color: #214dbb;
+                border: 1px solid rgba(77,163,255,.24);
+            }
+
+            .nexus-seed-warning {
+                background: #fff7e6;
+                color: #8a5d00;
+                border: 1px solid #f2d49b;
+            }
+
+            .nexus-seed-danger {
+                background: #fff0f0;
+                color: #b42318;
+                border: 1px solid #ffd1d1;
+            }
+
             .nexus-test-library-head {
                 display: flex;
                 justify-content: space-between;
@@ -2942,11 +3710,6 @@ function inject_nexus_lab_css() {
                 font-weight: 800;
             }
 
-            .nexus-governance-meta-grid,
-                .nexus-source-preview-meta {
-                    grid-template-columns: 1fr;
-                }
-
             .nexus-source-preview-meta {
                 display: grid;
                 grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3159,24 +3922,6 @@ function inject_nexus_lab_css() {
                 color: #173b8c;
             }
 
-            @media (max-width: 1200px) {
-                .nexus-test-case-grid {
-                    grid-template-columns: repeat(2, minmax(0, 1fr));
-                }
-
-                .nexus-form-grid {
-                    grid-template-columns: repeat(2, minmax(0, 1fr));
-                }
-
-                .nexus-observatory-layout {
-                    grid-template-columns: 1fr;
-                }
-
-                .nexus-observatory-metrics {
-                    grid-template-columns: repeat(3, minmax(0, 1fr));
-                }
-            }
-
             .nexus-combined-diagnostics {
                 margin-top: 10px;
                 padding: 14px;
@@ -3203,33 +3948,74 @@ function inject_nexus_lab_css() {
             }
 
             .nexus-history-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 14px;
-}
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 14px;
+            }
 
-.nexus-history-head .nexus-card-title {
-    margin-bottom: 0;
-}
+            .nexus-history-head .nexus-card-title {
+                margin-bottom: 0;
+            }
 
-.nexus-history-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
+            .nexus-history-actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
 
-    .nexus-history-actions .btn {
-        border-radius: 999px;
-        font-weight: 900;
-    }
+            .nexus-history-actions .btn {
+                border-radius: 999px;
+                font-weight: 900;
+            }
 
-    .nexus-history-actions .btn.active {
-        box-shadow: 0 8px 18px rgba(33, 77, 187, 0.16);
-        transform: translateY(-1px);
-    }
-                
+            .nexus-history-actions .btn.active {
+                box-shadow: 0 8px 18px rgba(33, 77, 187, 0.16);
+                transform: translateY(-1px);
+            }
+
+            @media (max-width: 1200px) {
+                .nexus-test-case-grid {
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                }
+
+                .nexus-form-grid {
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                }
+
+                .nexus-observatory-layout {
+                    grid-template-columns: 1fr;
+                }
+
+                .nexus-observatory-metrics {
+                    grid-template-columns: repeat(3, minmax(0, 1fr));
+                }
+            }
+
+            @media (max-width: 900px) {
+                .nexus-seed-status-grid {
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                }
+
+                .nexus-seed-module-list {
+                    grid-template-columns: 1fr;
+                }
+
+                .nexus-seed-head {
+                    flex-direction: column;
+                }
+
+                .nexus-seed-actions {
+                    justify-content: flex-start;
+                }
+
+                .nexus-governance-meta-grid,
+                .nexus-source-preview-meta {
+                    grid-template-columns: 1fr;
+                }
+            }
+
             @media (max-width: 700px) {
                 .nexus-form-grid,
                 .nexus-popup-summary,
@@ -3238,7 +4024,8 @@ function inject_nexus_lab_css() {
                 .nexus-score-grid,
                 .nexus-observatory-metrics,
                 .nexus-retrieval-timeline,
-                .nexus-source-preview-meta {
+                .nexus-source-preview-meta,
+                .nexus-seed-status-grid {
                     grid-template-columns: 1fr;
                 }
 
@@ -3258,7 +4045,9 @@ function inject_nexus_lab_css() {
 
                 .nexus-tab-btn,
                 .nexus-test-library-actions .btn,
-                .nexus-workspace-actions .btn {
+                .nexus-workspace-actions .btn,
+                .nexus-seed-actions .btn,
+                #nexus_refresh_seed_status {
                     width: 100%;
                 }
 
@@ -3268,6 +4057,4 @@ function inject_nexus_lab_css() {
             }
         </style>
     `);
-
-
 }

@@ -1,6 +1,6 @@
+# Synthetic test knowledge seeding for DIGITZ AI Nexus engine certification tests.
 import json
 import frappe
-
 
 UPDATE_EXISTING = True
 DUMMY_EMBEDDING = json.dumps([0.0, 1.0, 0.0])
@@ -792,34 +792,47 @@ def upsert_chunk(unit, data):
         chunk = frappe.new_doc("Nexus Knowledge Chunk")
         chunk.name = chunk_name
 
+    chunk_text = clean_text(data.get("content"))
+    chunk_hash = frappe.generate_hash(chunk_text, 32) if chunk_text else ""
+
     set_if_field(chunk, "knowledge_unit", unit.name)
+
     if data.get("knowledge_source") and frappe.db.exists("Nexus Knowledge Source", data.get("knowledge_source")):
         set_if_field(chunk, "knowledge_source", data.get("knowledge_source"))
+
     set_if_field(chunk, "chunk_index", 1)
 
     set_common_fields(chunk, data)
     set_content_fields(chunk, data.get("content"))
 
+    set_if_field(chunk, "chunk_hash", chunk_hash)
     set_if_field(chunk, "source_version", data.get("source_version") or 1)
     set_if_field(chunk, "archived", data.get("archived", 0))
     set_if_field(chunk, "disabled", data.get("disabled", 0))
     set_if_field(chunk, "enabled", data.get("enabled", 1))
     set_if_field(chunk, "is_active", data.get("is_active", 1))
+    set_if_field(chunk, "priority", data.get("priority") or 100)
 
-    set_if_field(chunk, "character_count", len(clean_text(data.get("content"))))
+    set_if_field(chunk, "character_count", len(chunk_text))
     set_if_field(chunk, "diagnostics_status", data.get("diagnostics_status") or "Healthy")
-    set_if_field(chunk, "diagnostics_message", data.get("diagnostics_message") or "Seed chunk passed diagnostics")
+    set_if_field(chunk, "diagnostics_message", data.get("diagnostics_message") or "Seed chunk passed diagnostics.")
     set_if_field(chunk, "embedding_status", data.get("embedding_status") or "Completed")
+    set_if_field(chunk, "embedding_model", data.get("embedding_model") or "synthetic-test-embedding")
+
     set_roles(chunk, data.get("allowed_roles") or [], data.get("denied_roles") or [])
 
     if chunk.meta.has_field("embedding"):
-        chunk.embedding = data.get("embedding") or ""
+        embedding_value = data.get("embedding") or ""
+
+        if isinstance(embedding_value, (list, tuple)):
+            embedding_value = json.dumps(list(embedding_value))
+
+        chunk.embedding = embedding_value
 
     if chunk.is_new():
         chunk.insert(ignore_permissions=True)
     else:
         chunk.save(ignore_permissions=True)
-
 
 def set_common_fields(doc, data):
     linked_policy = normalize_access_policy(data.get("access_policy"))
